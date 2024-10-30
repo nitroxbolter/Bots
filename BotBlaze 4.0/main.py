@@ -3,13 +3,12 @@ import json
 from datetime import datetime
 import telebot
 import time  # Importando time para usar no delay de reconexão
-
+#===========================================================================================================================
 # Configurações do bot
 api = "7277223979:AAFL1497sJw25z6L-rXuH96wzTa6uGZPJhk"  # Token do bot
 chat_id = "6045775620"  # ID do chat
-
 bot = telebot.TeleBot(api)
-
+#===========================================================================================================================
 # Variáveis globais
 buffer = ""
 processed_ids = set()
@@ -22,9 +21,10 @@ previous_result = None  # Variável para armazenar o resultado anterior
 entrada = 0  # Inicializa a variável de entrada para martingale
 max_gale = 2  # Defina o número máximo de martingales que você deseja permitir
 ultimo_resultado = None  # Variável para rastrear o último resultado
-
+minute = None
+#============================================ AQUI RECEBE OS DADOS DO WEBSOCKET E TRATA ===========================================================
 def on_message(ws, message):
-    global buffer, historico_resultados  # Declare historico_resultados como global
+    global buffer, historico_resultados, minute  # Declare minute como global
     buffer += message
     try:
         while buffer:
@@ -36,6 +36,7 @@ def on_message(ws, message):
                     informacoes_relevantes = extract_relevant_info(data)
                     if informacoes_relevantes:
                         resultado = informacoes_relevantes['roll']
+                        minute = informacoes_relevantes['minute']  # Armazena o minute globalmente
                         global previous_result
                         if resultado != previous_result:
                             previous_result = resultado  # Atualiza o resultado anterior
@@ -55,7 +56,7 @@ def extract_relevant_info(data):
 
         created_at = payload.get("created_at")
         created_at_dt = datetime.fromisoformat(created_at[:-1])  # Remove o 'Z'
-        minute = created_at_dt.minute
+        minute = created_at_dt.minute  # Extrai o minuto
 
         roll = payload.get("roll", [])
         if isinstance(roll, int):
@@ -65,14 +66,16 @@ def extract_relevant_info(data):
             "id": payload.get("id"),
             "color": payload.get("color"),
             "roll": roll,
-            "minute": minute,
+            "minute": minute,  # Armazena o minuto aqui
             "created_at": created_at_dt
         }
         return informacoes_relevantes
     except (KeyError, IndexError) as e:
         print(f"Erro ao extrair informações: {e}")
         return None
-
+#===========================================================================================================================
+#============================================ FUNÇÃO ESTRATEGY ====================================
+#Transforma os dados recebidos de roll Nº em cor 
 def estrategy(resultado, minute):
     global analise_sinal
     global cor_sinal
@@ -80,10 +83,6 @@ def estrategy(resultado, minute):
     global first_result
     global second_result
     
-    # Aqui você pode adicionar o código que utiliza resultado e minute
-    print(f"Resultado: {resultado}, Minute: {minute}")
-    # Implementação da lógica da estratégia
-
 
     cores = []
     for x in resultado:
@@ -104,36 +103,9 @@ def estrategy(resultado, minute):
         historico_resultados = historico_resultados[-10:]
 
     print(', '.join(historico_resultados))
+    
 
-    # Sinal 00: condições específicas
-    if minute == 24:
-        if first_result is None:
-            # Armazena o primeiro resultado
-            first_result = cores[-1] if cores else None
-            print(f'Primeiro resultado armazenado: {first_result}')
-        elif second_result is None:
-            # Armazena o segundo resultado
-            second_result = cores[-1] if cores else None
-            print(f'Segundo resultado armazenado: {second_result}')
-
-            # Compara o primeiro e o segundo resultados para o sinal 00
-            if first_result and second_result:
-                if second_result == 'P':
-                    cor_sinal = '⚫️'
-                    padrao = '🥷🏽Sinal 00: Apostar no V🥷🏽'  # Sinal 00
-                    enviar_sinal(cor_sinal, padrao)
-                    analise_sinal = True
-                    print('Sinal enviado: 🥷🏽Sinal 00: Apostar no V🥷🏽')
-                elif second_result == 'V':
-                    cor_sinal = '⚫️'
-                    padrao = '🥷🏽Sinal 00: Apostar no P🥷🏽'  # Sinal 00
-                    enviar_sinal(cor_sinal, padrao)
-                    analise_sinal = True
-                    print('Sinal enviado: 🥷🏽Sinal 00: Apostar no P🥷🏽')
-
-            # Limpa as variáveis para aguardar o próximo par de resultados
-            first_result = None
-            second_result = None
+    
 
     # Lógica para outros sinais (Samurai, Sniper e King)
     if analise_sinal:
@@ -163,6 +135,38 @@ def estrategy(resultado, minute):
             print('Sinal enviado: 👑King👑')
 
 
+    # if minute == 24:
+#     first_result = None
+#     second_result = None
+#     if first_result is None:
+#         # Armazena o primeiro resultado
+#         first_result = cores[-1] if cores else None
+#         print(f'Primeiro resultado armazenado: {first_result}')
+#     elif second_result is None:
+#         # Armazena o segundo resultado
+#         second_result = cores[-1] if cores else None
+#         print(f'Segundo resultado armazenado: {second_result}')
+#
+#         # Compara o primeiro e o segundo resultados para o sinal 00
+#         if first_result and second_result:
+#             if second_result == 'P':
+#                 cor_sinal = '⚫️'
+#                 padrao = '🥷🏽Sinal 00: Apostar no V🥷🏽'  # Sinal 00
+#                 enviar_sinal(cor_sinal, padrao)
+#                 analise_sinal = True
+#                 print('Sinal enviado: 🥷🏽Sinal 00: Apostar no V🥷🏽')
+#             elif second_result == 'V':
+#                 cor_sinal = '⚫️'
+#                 padrao = '🥷🏽Sinal 00: Apostar no P🥷🏽'  # Sinal 00
+#                 enviar_sinal(cor_sinal, padrao)
+#                 analise_sinal = True
+#                 print('Sinal enviado: 🥷🏽Sinal 00: Apostar no P🥷🏽')
+#
+#     first_result = None
+#     second_result = None
+
+
+
 def enviar_sinal(cor, padrao):
     mensagem = f'''
 🚨 Sinal encontrado 🚨
@@ -189,11 +193,11 @@ def correcao(results, color):
     current_result = results[0:1]
 
     # Correção para o sinal 00
-    if first_result is not None and second_result is not None:
-        if second_result == 'P':
-            color = '⚫️'  # Apostar no V
-        elif second_result == 'V':
-            color = '🛑'  # Apostar no P
+    #if first_result is not None and second_result is not None:
+       # if second_result == 'P':
+       #     color = '⚫️'  # Apostar no V
+       # elif second_result == 'V':
+       #     color = '🛑'  # Apostar no P
 
     # Lógica existente para correção
     if current_result == ['P'] and color == '⚫️':
